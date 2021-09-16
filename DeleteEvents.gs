@@ -1,0 +1,74 @@
+function DeleteEvents() {
+  /*  The DeleteEvents function in Calendar Scheduler takes input from
+      the AHS Personal Scheduler Google Spreadsheet and then deletes the
+      appointments for each class on each school day from the specified
+      Google Calendar. It only deletes events made by CreateEvents, denoted
+      by the text "This event was created by the webapp AHS Personal Calendar."
+      in the description of the event.
+
+      Author: Marianne Bezaire
+      Date Updated: September 16, 2021
+
+      Github code: https://github.com/mbezaire/ahs-scheduler
+
+      Report issues with this code to: https://github.com/mbezaire/ahs-scheduler/issues > New issue
+  */
+
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  Logger.log("Spreadsheet = " + ss);
+
+  var nowdate = new Date();
+
+  var bnames = ss.getSheets()[0];
+  var range = bnames.getRange("M6:N7");
+  var TermDates = range.getValues();
+  Logger.log(TermDates);
+
+  var range = bnames.getRange("H5");
+  if (range.getValue()=="All") {
+    var Term = 9;
+  } else {
+    var Term = range.getValue();
+  }
+
+  if (Term==1) {
+    var startYear = new Date(TermDates[0][0]);
+    var endYear = new Date(TermDates[0][1]);
+  } else if (Term==2) {
+    var startYear = new Date(TermDates[1][0]);
+    var endYear = new Date(TermDates[1][1]);
+  } else if (Term==9) {
+    var startYear = new Date(TermDates[0][0]);
+    var endYear = new Date(TermDates[1][1]);
+  }
+  Logger.log(startYear + " - " + endYear);
+
+  var bnames = ss.getSheets()[0];
+  var range = bnames.getRange("H3");
+  var CalName = range.getValue();
+
+  var range = bnames.getRange("H4");
+  var updateAll = (range.getValue()=='All');
+
+  var range = bnames.getRange("N5");
+  var sleepTime = range.getValue();
+
+  Logger.log("Will be deleting events from Calendar: " + CalName);
+
+  var events = CalendarApp.getCalendarsByName(CalName)[0].getEvents(startYear, endYear,
+    {search: "This event was created by the webapp AHS Personal Calendar."});
+  Logger.log("Events = " + events.length);
+  bnames.getRange("H10").setValue("You'll need to run the script again; still working.");
+
+  for (e=0; e<events.length; e++) {
+    if (nowdate<=events[e].getStartTime() || updateAll==true) {
+      events[e].deleteEvent();
+      Utilities.sleep(sleepTime)
+    }
+    if (e%20==0) {
+      Logger.log("Deleted " + e + " events so far...");
+    }
+  }
+  bnames.getRange("N2:N4").setValues([[0],[1],[ 0]]);
+  bnames.getRange("H10").setValue("All done, last updated at " + Date());
+}
