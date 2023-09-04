@@ -6,13 +6,25 @@ function DeleteEvents() {
       by the text "This event was created by the webapp AHS Personal Calendar."
       in the description of the event.
 
-      Author: Marianne Bezaire
-      Date Updated: September 16, 2021
+      Author: marianne.bezaire@andoverma.us
+      Date Updated: September 4, 2023
 
       Github code: https://github.com/mbezaire/ahs-scheduler
-
-      Report issues with this code to: https://github.com/mbezaire/ahs-scheduler/issues > New issue
   */
+
+
+  // Prevent script running if another is already running:
+  // https://stackoverflow.com/questions/67066779/how-to-prevent-google-apps-script-trigger-if-a-function-is-already-running
+  var isItRunning;
+
+  isItRunning = CacheService.getDocumentCache().put("itzRunning", "true",600);//Keep this value in Cache for up to X minutes
+  //There are 3 types of Cache - if the Apps Script project is not
+  //bound to a document then use ScriptCache
+  if (isItRunning) {//If this is true then another instance of this
+    //function is running which means that you dont want this
+    //instance of this function to run - so quit
+    return;//Stop running this instance of this function
+  }
 
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   Logger.log("Spreadsheet = " + ss);
@@ -71,4 +83,5 @@ function DeleteEvents() {
   }
   bnames.getRange("N2:N4").setValues([[0],[1],[ 0]]);
   bnames.getRange("H10").setValue("All done, last updated at " + Date());
+  CacheService.getDocumentCache().remove("itzRunning");
 }
