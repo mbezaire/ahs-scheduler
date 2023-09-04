@@ -3,13 +3,26 @@ function CreateEvents() {
       the AHS Personal Scheduler Google Spreadsheet and then populates
       a Google Calendar with appointments for each class on each school day.
 
-      Author: Marianne Bezaire
-      Date Updated: September 16, 2021
+      Author: marianne.bezaire@andoverma.us
+      Date Updated: September 4, 2023
 
       Github code: https://github.com/mbezaire/ahs-scheduler
-
-      Report issues with this code to: https://github.com/mbezaire/ahs-scheduler/issues > New issue
   */
+
+  // Prevent script running if another is already running:
+  // https://stackoverflow.com/questions/67066779/how-to-prevent-google-apps-script-trigger-if-a-function-is-already-running
+  var isItRunning;
+
+  isItRunning = CacheService.getDocumentCache().put("itzRunning", "true",600);//Keep this value in Cache for up to X minutes
+  //There are 3 types of Cache - if the Apps Script project is not
+  //bound to a document then use ScriptCache
+  if (isItRunning) {//If this is true then another instance of this
+    //function is running which means that you dont want this
+    //instance of this function to run - so quit
+    return;//Stop running this instance of this function
+  }
+
+
 
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   Logger.log("Will be pulling data from Spreadsheet " + ss)
@@ -22,9 +35,9 @@ function CreateEvents() {
   var range = scheds.getRange("K2:K6");
   const fullEndTimes =  range.getValues();// ["9:17", "10:41", "11:47", "13:43", "14:51"];
 
-  var range = scheds.getRange("AA2:AA4");
-  const halfStartTimes = range.getValues();// ["8:15", "9:22", "10:27"];
-  var range = scheds.getRange("AB2:AB4"); //
+  var range = scheds.getRange("AA2:AA6");
+  const halfStartTimes = range.getValues();// ["8:15", "9:05","9:52" "10:41"];
+  var range = scheds.getRange("AB2:AB6"); //
   const halfEndTimes = range.getValues();// ["9:18", "10:23", "11:30"];
 
   var range = scheds.getRange("J16:R19"); //
@@ -33,9 +46,11 @@ function CreateEvents() {
   // The rotating cycle of class meetings over 8 days
   var range = scheds.getRange("B8:I8");
   const dayTypeBlocks =range.getValues()[0];//  ["ACHEG",	"BDFGE",	"AHDCF",	"BAHGE",	"CBFDG",	"AHEFC",	"BADEG",	"CBHFD"];
+  var range = scheds.getRange("B9:I9");
+  const hTypeBlocks = range.getValues()[0];
 
   var range = scheds.getRange("T8:Z8");
-  const halfDayTypeBlocks = range.getValues()[0];// ["ABC","DEF","GAB","CDE","FGA","BCD","EFG"];
+  const halfDayTypeBlocks = range.getValues()[0];// ACHEG	BADEG	AFCHH	BDFGE	BAHGE	CBHFD	AHHDF
 
 
   // read in i and block - if the script times out in the middle of nested for loops, we want
@@ -195,7 +210,7 @@ function CreateEvents() {
       var mystart = new Date(startTimes[block]);
       var myend = new Date(endTimes[block]);
 
-      Logger.log(mystart.getHours() + ":" + mystart.getMinutes() + ":00 - " +myend.getHours() + ":"
+      Logger.log("what have we here: " + mystart.getHours() + ":" + mystart.getMinutes() + ":00 - " +myend.getHours() + ":"
         + myend.getMinutes() + ":00")
 
         // class ends at ... LunchClassTimes[lunch][0]
@@ -217,11 +232,31 @@ function CreateEvents() {
       Logger.log("todayBlocks = " + todayBlocks + ", block = " + block + ", blockLetter = "
         + blockLetter + ", blockletters = " + blockletters);
       var ind = blockletters.join('').indexOf(blockLetter);
+
       if (blocknames[ind][0]=="") {
         Logger.log("empty blocknames for ind = " + ind + ", move on from i=" + i)
         continue
       } // if no class specified (can happen for Staff) then skip making a calendar entry
+
+      if (blockLetter=="H") 
+      { // Get the H block number
+        var Hnum = hTypeBlocks[dayType-1]
+        if (Hnum == undefined)
+        {
+          Hnum = "";
+        }
+        Logger.log("Today's H Block is " + Hnum)
+        if(blocknames[ind][0][0]=="*") // some staff teach a few HBlocks
+        {
+          if (blocknames[ind][0].includes(Hnum.slice(1))==false) {
+            continue
+          }
+        }
+        var caltitle = Hnum + " Block (" + blockLetter + ")"; // Look up name on 1st tab given block 
+      } else {
         var caltitle = blocknames[ind][0] + " (" + blockLetter + ")"; // Look up name on 1st tab given block letter
+      }
+
         var calloc =  "Room #" + blockrooms[ind]; // Look up room on first tab given block letter
         var mydesc = "Session #" + values[i][3+ind]
 
@@ -234,7 +269,7 @@ function CreateEvents() {
         Logger.log("startTime=" + startTime + ", endTime=" + endTime + ", caltitle=" + caltitle
           + ", calloc=" + calloc)
         durations[ind] += durToday;
-        if (block==3) {// reg full day, 0-based block 4
+        if (block==3 && values[i][1]!="Half Day") {// reg full day, 0-based block 4
           var lunch = lunches[ind];
           if (lunch=="") {
             Logger.log("No lunch specified, making Block 3 the full time");
@@ -269,6 +304,8 @@ function CreateEvents() {
             }
           }
         }
+        if (startTime >= endTime)
+          Logger.log(startTime + " - " + endTime)
         var event = calendars.createEvent(caltitle, startTime, endTime, {location: calloc, description: mydesc});
   
   
@@ -287,4 +324,5 @@ function CreateEvents() {
   } // finished all the terms for this function
 
   iStart = 1;
+  CacheService.getDocumentCache().remove("itzRunning");
 }// finished the fcn
